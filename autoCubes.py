@@ -81,14 +81,14 @@ def adb_command(command):
     try:
         response = subprocess.check_output(os.path.join(__location__, "adb/adb") + " " + command, timeout=5)
     except subprocess.CalledProcessError:
-        print('Произошла ошибка adb. Проверьте, подключен ли телефон.')
+        print('adb error occurred. Check if the phone is connected.')
         exit()
-        response = 'Ошибка!'
+        response = 'Error!'
     except subprocess.TimeoutExpired:
-        print('Процесс adb превысил время ожидания и был закрыт. Попробуем еще раз')
+        print('The adb process timed out and was closed, lets try again')
         response = adb_command(command)
     return response
-
+    
 
 def start_photoncamera():
     adb_command("shell am start -n com.particlesdevs.photoncamera/com.particlesdevs.photoncamera.ui.SplashActivity")
@@ -149,14 +149,14 @@ def get_last_modified_file(folder, local=False):
 
 
 def wait_for_new_photo(folder, local=False):
-    print("Жду появления новой фотографии...")
+    print("Waiting for a new photo...")
     was = get_last_modified_file(folder, local)
     for i in range(20):
         now = get_last_modified_file(folder, local)
         if now != was:
-            print("Новое фото найдено.")
+            print("New photo found.")
             if '--gcam' in argv:
-                print('Жду окончания обработки фото...')
+                print('Waiting for the photo editing to finish...')
                 for j in range(10):
                     was = now
                     now = get_last_modified_file(folder, local)
@@ -168,7 +168,7 @@ def wait_for_new_photo(folder, local=False):
         else:
             was = now
             time.sleep(3)
-    print("Не могу найти новое фото...")
+    print("Cant find new photo...")
     exit()
 
 
@@ -210,7 +210,7 @@ def get_photo_colors(img, points_list):
 
 def show_result():
     with open(os.path.join(__location__, 'customCCT_autoCubes.txt')) as fp:
-        print('Результат калибровки:\r\n', fp.read())
+        print('Calibration result:\r\n', fp.read())
 
 
 def opencv_find_etalon(image_filename):
@@ -220,7 +220,7 @@ def opencv_find_etalon(image_filename):
     try:
         img = Image.open(os.path.join(__location__, image_filename))
     except FileNotFoundError:
-        print('Не могу найти файл фото!')
+        print('Cannot find photo file!')
         exit()
         return
     pil_image = img.convert('RGB')
@@ -451,11 +451,12 @@ def get_colors_from_test_photo(image='', photo_file='last_photo.jpg'):
                 photo_colors = get_photo_colors(im, points)
                 return photo_colors
         except OSError:
-            print('Не удалось прочитать файл изображения, пробую {} раз'.format(i + 2))
+            print('Failed to read image file.')
+            print('trying {} once'.format(i + 2))
             if '--nophone' not in argv:
                 pull_last_photo(get_last_modified_file(camera_folder))
             time.sleep(3)
-    print('Ничего не вышло :( Попробуйте еще раз')
+    print('Nothing worked :( Try again')
 
 
 def apply_matrix(points, m, debug=False):
@@ -539,7 +540,7 @@ def find_matrix_from_points(before, after, c_sum):  # Most fun function
 
         mult1 = (c_sum * (e - b) - mult3 * (e - b - f + c) - n) / (e - b - d + a + EPS)
     except RuntimeWarning:
-        print('Что-то не то в множителях. Справлюсь, не переживай!)')
+        print('Something is wrong with the multipliers. This is just a warning!)')
         return 0, 0, 0
 
     return mult1, mult2, mult3
@@ -580,9 +581,9 @@ def parse_cct_matrix_from_file(filename='customCCT.txt'):  # making cubes dict w
             file_contents = fp.readlines()
 
     except FileNotFoundError:
-        print('Не могу открыть файл :( То-ли его нет, то-ли доступ запрещен...')
+        print('Cannot open file. Not found or access denied.')
     except PermissionError:
-        print('Не могу открыть файл :( То-ли его нет, то-ли доступ запрещен...')
+        print('Cannot open file. Not found or access denied.')
     finally:
         if not file_contents:
             pass
@@ -810,13 +811,13 @@ def save_cubes_to_local_file(cubes: dict, custom_format=False, temp='warm', file
     else:   # Matrix
         file_text = f"""MATRIX\n\n{matrix_to_text(normalize_matrix(cubes['warm']['midtones']))}"""
     if '--debug' in argv:
-        print("В телефон будет записана матрица: \r\n", file_text)
+        print("The matrix will be written to the phone: \r\n", file_text)
 
     try:
         with open(os.path.join(__location__, filename), 'w') as fp:
             fp.write(file_text)
     except PermissionError:
-        print('Не могу записать в файл...')
+        print('Can't write to file.')
 
 
 def save_cubes_to_phone(cubes, single_cube=False, temp='warm'):
@@ -828,24 +829,51 @@ def save_cubes_to_phone(cubes, single_cube=False, temp='warm'):
 
 def help_message():
     text = """
-    Перед началом калибровки убедитесь, что вы снимаете мишень в необходимых условиях баланса белого.
-    Если вы будете использовать одну матрицу(gcam), снимайте в условиях нейтрального освещения
-    (дневной свет, лампа дневного света)
-    Снимайте цветовую мишень так, чтобы белый квадратик мишени был слева. 
-    При этом не важно, горизонтально или вертикально.
-    Для Gcam добавьте ключ --gcam.
-    Для использования с чекером x-rite  добавьте ключ --xrite.
-    Если калибруете две матрицы/кубы для теплой или холодной температур, по умолчанию калибруется теплая матрица.
-    Для калибровки холодной добавьте ключ --cool
-    Для двух матриц добавьте --matrixes
-    (правильно matrices, но у некоторых талантливых разрабов проблемы с английским)
-    Для куба добавьте --cube
-    Для кубов --cubes
-    
-    Если вы снимаете на PhotonCamera и телефон подключен по adb, 
-    то при калибровке автоматически выставится матрица для калибровки.
-    Если вы снимаете на Gcam с функцией cct, 
-    перед калибровкой отключите настройки цвета и выставьте матрицу следующим образом:
+    Before you start calibrating, make sure you shoot the target under the necessary white balance conditions.
+
+Connect your phone via adb (attached) and authorize it, if not done before, to automatically load photos from your phone.
+
+If there is an adb related error on startup and you are sure the phone is connected, check to see if adb is already running and terminate it in the task manager.
+
+Or use the --nophone key to use local photo. By default the local photo is found in the folder where the script is located and named last_photo.jpg
+
+If you want to specify a different file, you can send the file name to the script, e.g.
+
+python autoCubes.py --nophone some_photo.jpg
+
+(If you calibrate from a photo without a phone, you can't use matrix refinement because you have to take a photo with a calculated matrix to do that)
+
+If you are going to use one sensor (Google Camera), take the picture under neutral light (daylight, daylight bulb)
+
+Shoot the color target so that the white square of the target is on the left.
+
+It does not matter if it is horizontal or vertical.
+
+For Gcam (Google Camera) add the key --gcam
+
+For x-rite checker add key --xrite
+
+If you are calibrating two matrices/cubes for warm or cold temperatures, the warm matrix is calibrated by default.
+
+To calibrate cold, add the key --cool
+
+For two matrices, add --matrixes
+
+(correctly matrices, but some talented developers have problems with English)
+
+For a cube, add --cube
+
+For cubes add --cubes.
+
+If you shoot with a PhotonCamera and your phone is adb-connected, it will automatically calibrate the sensor for calibration.
+
+If you are shooting with a Google Camera with CCT, before calibrating, turn off the color settings and set the sensor as follows:
+
+RR: 1 RG: 0 RB: 0
+
+GR: 0 GG: 1 GB: 0
+
+Br: 0 BG: 0 BB: 1
     Rr: 1  Rg: 0  Rb: 0
     Gr: 0  Gg: 1  Gb: 0
     Br: 0  Bg: 0  Bb: 1
@@ -888,9 +916,9 @@ def generate_exp(etalon, np_sample):
 
 
 def check_calibration(cubes, temp='warm', np_sample_was=np.array([]), np_etalon_was=np.array([]), backup=dict({})):
-    print('Проверим калибровку.\r\n')
+    print('Checking calibration.\r\n')
     time.sleep(1)
-    print('Сделайте снимок цветового эталона.')
+    print('Take a picture of the color reference.')
     if '--nophone' not in argv:
         pull_last_photo(wait_for_new_photo(camera_folder))
         time.sleep(1)
@@ -916,7 +944,7 @@ def check_calibration(cubes, temp='warm', np_sample_was=np.array([]), np_etalon_
     # print(shadows)
     temperature = temp
 
-    print('Улучшим калибровку.')
+    print('Let's improve the calibration.')
     for i in range(1):  # Colors fixing
 
         # Initializing expected colors via checker colors comparison
@@ -1228,12 +1256,12 @@ def check_calibration(cubes, temp='warm', np_sample_was=np.array([]), np_etalon_
     if '--nophone' not in argv and '--gcam' not in argv:
         save_cubes_to_phone(cubes, True)
     else:
-        print('Текущая матрица:\r\n', normalize_matrix(cubes[temperature]['midtones']))
+        print('current matrix:\r\n', normalize_matrix(cubes[temperature]['midtones']))
         save_cubes_to_local_file(cubes)
     # show_result()
     
     if '--noinputs' not in argv:
-        once_more = input('Хотите еще раз проверить и уточнить калибровку? y/n: ')
+        once_more = input('Do you want to check and refine the calibration again? y/n: ')
     else:
         once_more = 'n'
 
@@ -1258,14 +1286,14 @@ def check_calibration(cubes, temp='warm', np_sample_was=np.array([]), np_etalon_
 
 def do_the_calibration(cubes, number_of_times, temperature='warm', backup=dict({})):
     print(help_message())
-    print("Выполняется настройка баланса белого/черного.")
+    print("The white/black balance is being adjusted.")
     # before_calib = get_colors_from_test_photo()
 
     if '--nophone' in argv:
         number_of_times = 1
     cubes_arr = []
 
-    print('Сделайте снимок цветового эталона.')
+    print('Take a picture of the color reference.')
 
     # Automatic shutter is not robust, so better keep out
     '''time.sleep(3)
@@ -1274,7 +1302,7 @@ def do_the_calibration(cubes, number_of_times, temperature='warm', backup=dict({
         tap_shutter()
         pull_last_photo(wait_for_new_photo())
     except:
-        print('Кажется, телефон не подключен. Возможно, другая проблема...')'''
+        print('It seems that the phone is not connected. Possibly another problem...')'''
     if '--nophone' not in argv:
         pull_last_photo(wait_for_new_photo(camera_folder))
         # wait_for_new_photo('.', True)
@@ -1304,18 +1332,18 @@ def do_the_calibration(cubes, number_of_times, temperature='warm', backup=dict({
                 '''contrast_level = np.sum(np_sample[0] - np_sample[5])
                 contrast_etalon = np.sum(np_etalon[0] - np_etalon[5])
                 if contrast_etalon / contrast_level > 1.5:
-                    print('Контраст слишком низкий. Стоит попробовать понизить тени.')
+                    print('The contrast is too low. It is worth trying to lower the shadows.')
                     low_contrast = True
                     high_contrast = False
                 elif contrast_etalon / contrast_level < 0.75:
-                    print('Контраст слишком высокий. Попробуйте поднять тени в настройках.')
+                    print('The contrast is too high. Try turning up the shadows in the settings.')
                     high_contrast = True
                     low_contrast = False
                 else:
                     low_contrast = False
                     high_contrast = False
-                print('Контраст: ', contrast_level)
-                print('Должен быть: ', contrast_etalon)
+                print('Contrast: ', contrast_level)
+                print('It should be: ', contrast_etalon)
                 '''
                 # Computing multipliers for matrices
                 diff = np_etalon - np_sample
@@ -1345,11 +1373,11 @@ def do_the_calibration(cubes, number_of_times, temperature='warm', backup=dict({
                     after_wb = col1  # Backuping colors after wb correction'''
 
         if '--nowb' not in argv:
-            print('Настройка баланса белого/черного завершена.')
+            print('White/black balance adjustment completed.')
             # print('Было:\r\n', before_calib, '\r\n', 'Стало:\r\n', col1)
         if '--debug' in argv:
             print('After wb correction:\r\n', normalize_matrix(cubes[temperature]['midtones']))
-        print('Приступаем к калибровке цветов.')
+        print('Getting Started with Color Calibration.')
         for i in range(1):  # Colors fixing
 
             exp = generate_exp(np_etalon, np_sample)
@@ -1523,7 +1551,7 @@ def do_the_calibration(cubes, number_of_times, temperature='warm', backup=dict({
                         diff = appl - exp
                         red_diff = diff[9]
                         pink_diff = diff[14]
-                        print('gr - br +')
+                        print('Refining: -GR, +BR')
                     count = 0
                     while red_diff[1] < red_diff[2] and pink_diff[1] < pink_diff[2]:
                         matrix = matrix_plus_minus(matrix, (1, 0), (2, 0), 0.01)
@@ -1532,7 +1560,7 @@ def do_the_calibration(cubes, number_of_times, temperature='warm', backup=dict({
                         red_diff = diff[9]
                         pink_diff = diff[14]
                         count += 1
-                        print('gr + br -')
+                        print('Refining: +GR, -BR')
 
                     green_diff = diff[10]
                     dark_green_diff = diff[20]
@@ -1543,7 +1571,7 @@ def do_the_calibration(cubes, number_of_times, temperature='warm', backup=dict({
                         diff = appl - exp
                         green_diff = diff[10]
                         dark_green_diff = diff[20]
-                        print('rg - bg +')
+                        print('Refining: -RG, +BG')
 
                     while green_diff[0] < green_diff[2] and dark_green_diff[0] < dark_green_diff[2]:
                         matrix = matrix_plus_minus(matrix, (0, 1), (2, 1), 0.01)
@@ -1551,7 +1579,7 @@ def do_the_calibration(cubes, number_of_times, temperature='warm', backup=dict({
                         diff = appl - exp
                         green_diff = diff[10]
                         dark_green_diff = diff[20]
-                        print('rg + bg -')
+                        print('Refining: +RG, -BG')
 
                     blue_diff = diff[11]
                     light_blue_diff = diff[21]
@@ -1564,7 +1592,7 @@ def do_the_calibration(cubes, number_of_times, temperature='warm', backup=dict({
                         blue_diff = diff[11]
                         light_blue_diff = diff[21]
                         count += 1
-                        print('rb + gb -')
+                        print('Refining: +RB, -GB')
                     count = 0
                     while blue_diff[1] < blue_diff[0] and light_blue_diff[1] < light_blue_diff[0]:
                         matrix = matrix_plus_minus(matrix, (1, 2), (0, 2), 0.01)
@@ -1573,7 +1601,7 @@ def do_the_calibration(cubes, number_of_times, temperature='warm', backup=dict({
                         blue_diff = diff[11]
                         light_blue_diff = diff[21]
                         count += 1
-                        print('rb - gb +')
+                        print('Refining: +RB, -GB')
                     return matrix, diff
 
                 matrix, new_lowest_diff = random_matrix(matrix)
@@ -1745,7 +1773,7 @@ def do_the_calibration(cubes, number_of_times, temperature='warm', backup=dict({
                                                     [0.0061, 1.0145, -0.0206],
                                                     [-0.0196, -0.0175, 1.0289]])'''
 
-    print('Калибровка завершена, удачной фотоохоты!')
+    print('Calibration completed!')
 
     if '--nophone' not in argv and '--gcam' not in argv:
         if '--cube' not in argv:
